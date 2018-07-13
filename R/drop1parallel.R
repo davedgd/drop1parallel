@@ -3,7 +3,7 @@ library(MASS)
 library(gtools)
 library(lme4)
 
-drop1.parallel <- function (theModel, test = "Chisq") { # only supports Chisq curently for all models (argument not used)
+drop1parallel <- function (theModel, test = "Chisq") { # only supports Chisq curently for all models (argument not used)
   
   if (class(theModel) != "glmerMod")
     stop("You must supply a glmer model...")
