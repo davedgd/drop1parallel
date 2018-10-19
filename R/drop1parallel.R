@@ -93,7 +93,7 @@ drop1parallel <- function (theModel, test = "Chisq", passData = NULL) { # only s
 
 ###
 
-stepAICparallel <- function (startMod, theThreshold = 0, passData = NULL, ignoreTerms = NULL) {
+stepAICparallel <- function (startMod, theThreshold = 0, passData = NULL, ignoreTerms = NULL, evaluateTerms = NULL) {
   
   start.time <- Sys.time()
   
@@ -108,8 +108,20 @@ stepAICparallel <- function (startMod, theThreshold = 0, passData = NULL, ignore
     if (sum(ignoreTerms %in% potentialDrops) != length(ignoreTerms))
       stop("One or more ignore terms not found in the model...")
     cat(paste("\nIgnoring specified terms:", paste(ignoreTerms, collapse = ", "), "\n"))
+    
     startFrame <- subset(startFrame, !(term %in% ignoreTerms))
   }
+  
+  if (!is.null(evaluateTerms)) {
+    if (sum(evaluateTerms %in% potentialDrops) != length(evaluateTerms))
+      stop("One or more evaluate terms not found in the model...")
+    cat(paste("\nEvaluating specified terms:", paste(evaluateTerms, collapse = ", "), "\n"))
+    
+    startFrame <- subset(startFrame, term %in% evaluateTerms)
+  }
+  
+  if (length(intersect(ignoreTerms, evaluateTerms)) > 0)
+    stop("Ignored and evaluated terms should not intersect...")
   
   stepDownMod <- startMod
   
@@ -148,6 +160,9 @@ stepAICparallel <- function (startMod, theThreshold = 0, passData = NULL, ignore
       
       if (!is.null(ignoreTerms))
         startFrame <- subset(startFrame, !(term %in% ignoreTerms))
+
+      if (!is.null(evaluateTerms))
+        startFrame <- subset(startFrame, term %in% evaluateTerms)
       
       startFrame[order(startFrame$pVal),]
       
