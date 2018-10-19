@@ -93,7 +93,7 @@ drop1parallel <- function (theModel, test = "Chisq", passData = NULL) { # only s
 
 ###
 
-stepAICparallel <- function (startMod, theThreshold = 0, passData = NULL) {
+stepAICparallel <- function (startMod, theThreshold = 0, passData = NULL, ignoreTerms = NULL) {
   
   start.time <- Sys.time()
   
@@ -101,6 +101,15 @@ stepAICparallel <- function (startMod, theThreshold = 0, passData = NULL) {
   
   startFrame <- data.frame(term = rownames(startPoint), pVal = startPoint[, grep("Pr", names(startPoint))], AIC = startPoint[, grep("AIC", names(startPoint))])[-1,]
   rownames(startFrame) <- NULL
+  
+  potentialDrops <- drop.scope(lme4:::getFixedFormula(formula(theModel)), formula("~ 1"))
+  
+  if (!is.null(ignoreTerms)) {
+    if (sum(ignoreTerms %in% potentialDrops) != length(ignoreTerms))
+      stop("One or more ignore terms not found in the model...")
+    cat(paste("\nIgnoring specified terms:", paste(ignoreTerms, collapse = ", "), "\n"))
+    startFrame <- subset(startFrame, !(term %in% ignoreTerms))
+  }
   
   stepDownMod <- startMod
   
@@ -136,6 +145,9 @@ stepAICparallel <- function (startMod, theThreshold = 0, passData = NULL) {
       
       startFrame <- data.frame(term = rownames(startPoint), pVal = startPoint[, grep("Pr", names(startPoint))], AIC = startPoint[, grep("AIC", names(startPoint))])[-1,]
       rownames(startFrame) <- NULL
+      
+      if (!is.null(ignoreTerms))
+        startFrame <- subset(startFrame, !(term %in% ignoreTerms))
       
       startFrame[order(startFrame$pVal),]
       
