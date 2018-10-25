@@ -102,7 +102,7 @@ stepAICparallel <- function (startMod, theThreshold = 0, passData = NULL, ignore
   startFrame <- data.frame(term = rownames(startPoint), pVal = startPoint[, grep("Pr", names(startPoint))], AIC = startPoint[, grep("AIC", names(startPoint))])[-1,]
   rownames(startFrame) <- NULL
   
-  potentialDrops <- drop.scope(lme4:::getFixedFormula(formula(theModel)), formula("~ 1"))
+  potentialDrops <- drop.scope(lme4:::getFixedFormula(formula(startMod)), formula("~ 1"))
   
   if (!is.null(ignoreTerms)) {
     if (sum(ignoreTerms %in% potentialDrops) != length(ignoreTerms))
