@@ -5,50 +5,59 @@ library(lme4)
 
 drop1parallel <- function (theModel, test = "Chisq", passData = NULL) { # only supports Chisq curently for all models (argument not used)
   
-  if (!(class(theModel) %in% c("glmerMod", "clmm")))
-    stop("You must supply a glmer or clmm model...")
+  if (!(class(theModel) %in% c("glmerMod", "clmm", "glmmTMB")))
+    stop("You must supply a glmer, clmm, or glmmTMB model...")
   
   if (length(intersect(class(theModel), c("glmerMod", "lmerMod", "lmerModLmerTest"))) > 0) {
-  
+    
     if (!is.null(passData))
       stop("You do not need to pass data for a glmer model...")
     
     if (class(theModel) == "glmerMod")
       originalData <- theModel@call[['data']]
     
-      potentialDrops <- drop.scope(lme4:::getFixedFormula(formula(theModel)), formula("~ 1"))
-      cat(paste("Dropping ", length(potentialDrops), " terms on ", getDoParWorkers(), " cores...\n\n", sep = ""))
-      res <- foreach(theDrop = potentialDrops, .packages = attr(class(theModel), "package")) %dopar% update(theModel, as.formula(paste(".~.-", theDrop)), data = theModel@frame) # data = dat
+    potentialDrops <- drop.scope(lme4:::getFixedFormula(formula(theModel)), formula("~ 1"))
+    cat(paste("Dropping ", length(potentialDrops), " terms on ", getDoParWorkers(), " cores...\n\n", sep = ""))
+    res <- foreach(theDrop = potentialDrops, .packages = attr(class(theModel), "package")) %dopar% update(theModel, as.formula(paste(".~.-", theDrop)), data = theModel@frame)
     
-    } else if (class(theModel) == "clmm") {
-      
-      if (is.null(passData))
-        stop("You currently must pass data for a clmm model...")
-      else
-        originalData <- passData
-      
-      potentialDrops <- drop.scope(lme4:::getFixedFormula(formula(theModel)), formula("~ 1"))
-      cat(paste("Dropping ", length(potentialDrops), " terms on ", getDoParWorkers(), " cores...\n\n", sep = ""))
-      res <- foreach(theDrop = potentialDrops, .packages = c("ordinal")) %dopar% update(theModel, as.formula(paste(".~.-", theDrop)), data = originalData)
-  
-    } else {
-      
-      potentialDrops <- drop.scope(formula(theModel), formula("~ 1"))
-      cat(paste("Dropping ", length(potentialDrops), " terms on ", getDoParWorkers(), " cores...\n\n", sep = ""))
-      res <- foreach(theDrop = potentialDrops, .packages = attr(class(theModel), "package")) %dopar% update(theModel, as.formula(paste(".~.-", theDrop)))
-      
-      }
+  } else if (class(theModel) %in% c("clmm", "glmmTMB")) {
+    
+    if (is.null(passData))
+      stop("You currently must pass data for a clmm model...")
+    else
+      originalData <- passData
+    
+    if (class(theModel) == "clmm")
+      requiredPackages <- "ordinal"
+    else if (class(theModel) == "glmmTMB")
+      requiredPackages <- "glmmTMB"
+    
+    potentialDrops <- drop.scope(lme4:::getFixedFormula(formula(theModel)), formula("~ 1"))
+    cat(paste("Dropping ", length(potentialDrops), " terms on ", getDoParWorkers(), " cores...\n\n", sep = ""))
+    res <- foreach(theDrop = potentialDrops, .packages = requiredPackages) %dopar% update(theModel, as.formula(paste(".~.-", theDrop)), data = originalData)
+    
+  } else {
+    
+    potentialDrops <- drop.scope(formula(theModel), formula("~ 1"))
+    cat(paste("Dropping ", length(potentialDrops), " terms on ", getDoParWorkers(), " cores...\n\n", sep = ""))
+    res <- foreach(theDrop = potentialDrops, .packages = attr(class(theModel), "package")) %dopar% update(theModel, as.formula(paste(".~.-", theDrop)))
+    
+  }
   
   if (length(intersect(class(theModel), c("glmerMod", "lmerMod", "lmerModLmerTest", "glm"))) > 0)
     for (each in 1:length(res))
       res[[each]]@call[['data']] <- originalData
+  
+  if (length(intersect(class(theModel), c("glmmTMB"))) > 0)
+    for (each in 1:length(res))
+      res[[each]]$call[['data']] <- theModel$call$data
   #lapply(res, function(x) x@call[['data']])
   #anova(theModel, res[[1]])
   
   cat("Single term deletions\n\nModel:\n")
   print(formula(theModel))
   
-  if (length(intersect(class(theModel), c("glmerMod", "lmerMod", "lmerModLmerTest"))) > 0) {
+  if (length(intersect(class(theModel), c("glmerMod", "lmerMod", "lmerModLmerTest", "glmmTMB"))) > 0) {
     dropSummary <- data.frame(check.names = FALSE,
                               row.names = c("<none>", potentialDrops), 
                               Df = c("", sapply(res, function(x) attr(logLik(theModel), "df") - attr(logLik(x), "df"))),
@@ -58,7 +67,7 @@ drop1parallel <- function (theModel, test = "Chisq", passData = NULL) { # only s
                               `Pr(Chi)` = c("", round(sapply(res, function(x) anova(x, theModel, test = "Chisq")$"Pr(>Chisq)"[2]), 4)),
                               ` ` = c("", stars.pval(sapply(res, function(x) anova(x, theModel, test = "Chisq")$"Pr(>Chisq)"[2])))) }
   else if (class(theModel) == "clmm") {
-                                
+    
     dropSummary <- data.frame(check.names = FALSE,
                               row.names = c("<none>", potentialDrops), 
                               Df = c("", sapply(res, function(x) attr(logLik(theModel), "df") - attr(logLik(x), "df"))),
@@ -68,7 +77,7 @@ drop1parallel <- function (theModel, test = "Chisq", passData = NULL) { # only s
                               `Pr(Chi)` = c("", round(sapply(res, function(x) ordinal:::anova.clm(x, theModel)["Pr(>Chisq)"][2,1]), 3)),
                               ` ` = c("", stars.pval(round(sapply(res, function(x) ordinal:::anova.clm(x, theModel)["Pr(>Chisq)"][2,1]), 4)))) }
   else {
-                                
+    
     dropSummary <- data.frame(check.names = FALSE,
                               row.names = c("<none>", potentialDrops), 
                               df = c("", sapply(res, function(x) attr(logLik(theModel), "df") - attr(logLik(x), "df"))),
@@ -78,7 +87,7 @@ drop1parallel <- function (theModel, test = "Chisq", passData = NULL) { # only s
                               `Pr(>Chi)` = c("", round(sapply(res, function(x) anova(x, theModel, test = "Chisq")$"Pr(>Chi)"[2]), 4)))   
   }
   
-  if (length(intersect(class(theModel), c("glmerMod", "lmerMod", "lmerModLmerTest", "glm", "clmm"))) > 0)
+  if (length(intersect(class(theModel), c("glmerMod", "lmerMod", "lmerModLmerTest", "glm", "clmm", "glmmTMB"))) > 0)
     print(dropSummary) else {
       
       print(cbind(dropSummary, Deviance = theDeviance)[, c("df", "Deviance", "AIC")])
@@ -160,7 +169,7 @@ stepAICparallel <- function (startMod, theThreshold = 0, passData = NULL, ignore
       
       if (!is.null(ignoreTerms))
         startFrame <- subset(startFrame, !(term %in% ignoreTerms))
-
+      
       if (!is.null(evaluateTerms))
         startFrame <- subset(startFrame, term %in% evaluateTerms)
       
