@@ -132,7 +132,10 @@ stepAICparallel <- function (startMod, theThreshold = 0, passData = NULL, ignore
   if (length(intersect(ignoreTerms, evaluateTerms)) > 0)
     stop("Ignored and evaluated terms should not intersect...")
   
+  # initialize
   stepDownMod <- startMod
+  finalStepLRT <- startPoint
+  dropSummary <- data.frame(dropTerm = NA, df = NA, AIC = NA)
   
   loopStore <- list(startMod)
   dropStore <- list(NA)
