@@ -3,22 +3,22 @@ library(MASS)
 library(gtools)
 library(lme4)
 
-drop1parallel <- function (theModel, test = "Chisq", passData = NULL) { # only supports Chisq curently for all models (argument not used)
+drop1parallel <- function (theModel, test = "Chisq", passData = NULL) { # only supports Chisq currently for all models (argument not used)
   
   if (!(class(theModel) %in% c("glmerMod", "clmm", "glmmTMB")))
     stop("You must supply a glmer, clmm, or glmmTMB model...")
   
   if (length(intersect(class(theModel), c("glmerMod", "lmerMod", "lmerModLmerTest"))) > 0) {
     
-    if (!is.null(passData))
-      stop("You do not need to pass data for a glmer model...")
+    if (is.null(passData))
+      stop("You currently must pass data for a lme4 model...")
     
     if (class(theModel) == "glmerMod")
       originalData <- theModel@call[['data']]
     
     potentialDrops <- drop.scope(lme4:::getFixedFormula(formula(theModel)), formula("~ 1"))
     cat(paste("Dropping ", length(potentialDrops), " terms on ", getDoParWorkers(), " cores...\n\n", sep = ""))
-    res <- foreach(theDrop = potentialDrops, .packages = attr(class(theModel), "package")) %dopar% update(theModel, as.formula(paste(".~.-", theDrop)), data = theModel@frame)
+    res <- foreach(theDrop = potentialDrops, .packages = attr(class(theModel), "package")) %dopar% update(theModel, as.formula(paste(".~.-", theDrop)), data = passData)
     
   } else if (class(theModel) %in% c("clmm", "glmmTMB")) {
     
@@ -45,8 +45,9 @@ drop1parallel <- function (theModel, test = "Chisq", passData = NULL) { # only s
   }
   
   if (length(intersect(class(theModel), c("glmerMod", "lmerMod", "lmerModLmerTest", "glm"))) > 0)
-    for (each in 1:length(res))
+    for (each in 1:length(res)) {
       res[[each]]@call[['data']] <- originalData
+    }
   
   if (length(intersect(class(theModel), c("glmmTMB"))) > 0)
     for (each in 1:length(res))
