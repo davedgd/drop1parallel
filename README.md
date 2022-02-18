@@ -24,3 +24,7 @@ gm2 <- glmer(outcome~ treatment + poly(visit, 2) +(1|patientID),
 
 stepAICparallel(gm2, passData = toenail)
 ```
+
+### To-Do
+- code cleanup
+- add an option for automated polynomial reduction (e.g., cubic -> quadratic -> linear)
