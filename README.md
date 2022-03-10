@@ -28,3 +28,4 @@ stepAICparallel(gm2, passData = toenail)
 ### To-Do
 - code cleanup
 - add an option for automated polynomial reduction (e.g., cubic -> quadratic -> linear)
+- report convergence or model fit issues during stepwise reduction
