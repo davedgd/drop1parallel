@@ -1,5 +1,5 @@
 # drop1parallel
-A parallel version of the drop1 function for R
+A parallel version of the drop1 (and stepAIC) function for R
 
 ### Installation
 ```R
