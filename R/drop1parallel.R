@@ -66,7 +66,7 @@ drop1parallel <- function (theModel, test = "Chisq", passData = NULL) { # only s
                               AIC = round(c(AIC(theModel), sapply(res, AIC)), 3),
                               LRT = c("", round(sapply(res, function(x) anova(x, theModel, test = "Chisq")$"Chisq"[2]), 5)),
                               `Pr(Chi)` = c("", round(sapply(res, function(x) anova(x, theModel, test = "Chisq")$"Pr(>Chisq)"[2]), 4)),
-                              ` ` = c("", stars.pval(sapply(res, function(x) anova(x, theModel, test = "Chisq")$"Pr(>Chisq)"[2])))) }
+                              ` ` = c("", gtools::stars.pval(sapply(res, function(x) anova(x, theModel, test = "Chisq")$"Pr(>Chisq)"[2])))) }
   else if (class(theModel) == "clmm") {
     
     dropSummary <- data.frame(check.names = FALSE,
@@ -76,7 +76,7 @@ drop1parallel <- function (theModel, test = "Chisq", passData = NULL) { # only s
                               AIC = round(c(AIC(theModel), sapply(res, AIC)), 3),
                               LRT = c("", round(sapply(res, function(x) ordinal:::anova.clm(x, theModel)["LR.stat"][2,1]), 3)),
                               `Pr(Chi)` = c("", round(sapply(res, function(x) ordinal:::anova.clm(x, theModel)["Pr(>Chisq)"][2,1]), 3)),
-                              ` ` = c("", stars.pval(round(sapply(res, function(x) ordinal:::anova.clm(x, theModel)["Pr(>Chisq)"][2,1]), 4)))) }
+                              ` ` = c("", gtools::stars.pval(round(sapply(res, function(x) ordinal:::anova.clm(x, theModel)["Pr(>Chisq)"][2,1]), 4)))) }
   else {
     
     dropSummary <- data.frame(check.names = FALSE,
