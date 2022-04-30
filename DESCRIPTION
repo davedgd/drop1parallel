@@ -8,4 +8,4 @@ License: What license is it under?
 Encoding: UTF-8
 LazyData: true
 Imports:
-    gtools,
+    gtools,doParallel
