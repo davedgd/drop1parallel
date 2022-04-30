@@ -22,6 +22,10 @@ gm2 <- glmer(outcome~ treatment + poly(visit, 2) +(1|patientID),
                data=toenail,
                family=binomial,nAGQ=20)
 
+# for drop1, i.e., drop1(gm2):
+drop1parallel(gm2, passData = toenail)
+
+# for backwards stepwise AIC along the lines of MASS:stepAIC and others:
 stepAICparallel(gm2, passData = toenail)
 ```
 
