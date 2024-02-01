@@ -3,7 +3,7 @@ library(MASS)
 library(gtools)
 library(lme4)
 
-drop1parallel <- function (theModel, test = "Chisq", passData = NULL) { # only supports Chisq currently for all models (argument not used)
+drop1parallel <- function (theModel, test = "Chisq", passData = NULL, roundAIC = 3) { # only supports Chisq currently for all models (argument not used)
   
   if (!(class(theModel) %in% c("glmerMod", "clmm", "glmmTMB")))
     stop("You must supply a glmer, clmm, or glmmTMB model...")
@@ -23,7 +23,7 @@ drop1parallel <- function (theModel, test = "Chisq", passData = NULL) { # only s
   } else if (class(theModel) %in% c("clmm", "glmmTMB")) {
     
     if (is.null(passData))
-      stop("You currently must pass data for a clmm model...")
+      stop("You currently must pass data for a clmm or glmmTMB model...")
     else
       originalData <- passData
     
@@ -58,12 +58,16 @@ drop1parallel <- function (theModel, test = "Chisq", passData = NULL) { # only s
   cat("Single term deletions\n\nModel:\n")
   print(formula(theModel))
   
+  calcAIC <- c(AIC(theModel), sapply(res, AIC))
+  if (!is.null(roundAIC))
+    calcAIC <- round(calcAIC, roundAIC)
+  
   if (length(intersect(class(theModel), c("glmerMod", "lmerMod", "lmerModLmerTest", "glmmTMB"))) > 0) {
     dropSummary <- data.frame(check.names = FALSE,
                               row.names = c("<none>", potentialDrops), 
                               Df = c("", sapply(res, function(x) attr(logLik(theModel), "df") - attr(logLik(x), "df"))),
                               #Deviance = round(c(deviance(theModel), sapply(X = res, FUN = deviance)), 4),
-                              AIC = round(c(AIC(theModel), sapply(res, AIC)), 3),
+                              AIC = calcAIC,
                               LRT = c("", round(sapply(res, function(x) anova(x, theModel, test = "Chisq")$"Chisq"[2]), 5)),
                               `Pr(Chi)` = c("", round(sapply(res, function(x) anova(x, theModel, test = "Chisq")$"Pr(>Chisq)"[2]), 4)),
                               ` ` = c("", gtools::stars.pval(sapply(res, function(x) anova(x, theModel, test = "Chisq")$"Pr(>Chisq)"[2])))) }
@@ -73,7 +77,7 @@ drop1parallel <- function (theModel, test = "Chisq", passData = NULL) { # only s
                               row.names = c("<none>", potentialDrops), 
                               Df = c("", sapply(res, function(x) attr(logLik(theModel), "df") - attr(logLik(x), "df"))),
                               #Deviance = round(c(deviance(theModel), sapply(X = res, FUN = deviance)), 4),
-                              AIC = round(c(AIC(theModel), sapply(res, AIC)), 3),
+                              AIC = calcAIC,
                               LRT = c("", round(sapply(res, function(x) ordinal:::anova.clm(x, theModel)["LR.stat"][2,1]), 3)),
                               `Pr(Chi)` = c("", round(sapply(res, function(x) ordinal:::anova.clm(x, theModel)["Pr(>Chisq)"][2,1]), 3)),
                               ` ` = c("", gtools::stars.pval(round(sapply(res, function(x) ordinal:::anova.clm(x, theModel)["Pr(>Chisq)"][2,1]), 4)))) }
@@ -83,7 +87,7 @@ drop1parallel <- function (theModel, test = "Chisq", passData = NULL) { # only s
                               row.names = c("<none>", potentialDrops), 
                               df = c("", sapply(res, function(x) attr(logLik(theModel), "df") - attr(logLik(x), "df"))),
                               Deviance = round(c(deviance(theModel), sapply(X = res, FUN = deviance)), 4),
-                              AIC = round(c(AIC(theModel), sapply(res, AIC)), 3),
+                              AIC = calcAIC,
                               LRT = c("", round(sapply(res, function(x) anova(x, theModel, test = "Chisq")$"Deviance"[2]), 5)),
                               `Pr(>Chi)` = c("", round(sapply(res, function(x) anova(x, theModel, test = "Chisq")$"Pr(>Chi)"[2]), 4)))   
   }
@@ -107,7 +111,7 @@ stepAICparallel <- function (startMod, theThreshold = 0, passData = NULL, ignore
   
   start.time <- Sys.time()
   
-  startPoint <- drop1parallel(startMod, test = "Chisq", passData)
+  startPoint <- drop1parallel(startMod, test = "Chisq", passData, roundAIC = NULL)
   
   startFrame <- data.frame(term = rownames(startPoint), pVal = startPoint[, grep("Pr", names(startPoint))], AIC = startPoint[, grep("AIC", names(startPoint))])[-1,]
   rownames(startFrame) <- NULL
@@ -144,8 +148,6 @@ stepAICparallel <- function (startMod, theThreshold = 0, passData = NULL, ignore
   # to-do: need to warn/error if REML = FALSE not set for lmer
   # to-do: this won't work for lmer until drop1parallel returns p values
   
-  theThreshold <- 0
-  
   if (AIC(startMod) - min(startFrame$AIC) > theThreshold) {
     
     paste("Next Drop:", subset(startFrame, AIC == min(AIC))$term)
@@ -159,6 +161,9 @@ stepAICparallel <- function (startMod, theThreshold = 0, passData = NULL, ignore
       
       fieldToRemove <- as.character(subset(startFrame, AIC == min(AIC))$term)
       
+      if(length(fieldToRemove) > 1)
+        stop("Multiple drops problem detected...")
+      
       cat(paste("Now Dropping: ", fieldToRemove, "\n", sep=""))
       
       stepDownMod <- update(stepDownMod, as.formula(paste(".~.-", fieldToRemove)) )
@@ -166,7 +171,7 @@ stepAICparallel <- function (startMod, theThreshold = 0, passData = NULL, ignore
       loopStore[[length(loopStore) + 1]] <- stepDownMod
       dropStore[[length(dropStore) + 1]] <- fieldToRemove
       
-      startPoint <- drop1parallel(stepDownMod, test = "Chisq", passData)
+      startPoint <- drop1parallel(stepDownMod, test = "Chisq", passData, roundAIC = NULL)
       
       startFrame <- data.frame(term = rownames(startPoint), pVal = startPoint[, grep("Pr", names(startPoint))], AIC = startPoint[, grep("AIC", names(startPoint))])[-1,]
       rownames(startFrame) <- NULL
@@ -179,9 +184,12 @@ stepAICparallel <- function (startMod, theThreshold = 0, passData = NULL, ignore
       
       startFrame[order(startFrame$pVal),]
       
+      theDFs <- list()
+      for (i in 1:length(loopStore))
+        theDFs[i] <- attr(logLik(loopStore[[i]]), "df")
     }
     
-    AIC(startMod, stepDownMod)
+    #AIC(startMod, stepDownMod)
     
     theDFs <- list()
     for (i in 1:length(loopStore))
